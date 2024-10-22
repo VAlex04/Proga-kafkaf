@@ -1,3 +1,4 @@
+// task3star.C
 #include <TMath.h>
 #include <TF1.h>
 #include <TCanvas.h>
@@ -6,7 +7,7 @@
 #include <iostream>
 
 // Константы
-const Double_t hbar2_over_2m_star = 3.80998; // (ħ²)/(2m) в eV·Å²
+const Double_t hbar2_over_2m_star = 3.80998; // (ħ²)/(2м) в eV·Å²
 const Double_t V0_star = 0.5;                // Глубина потенциальной ямы в эВ
 
 // Волновая функция ψ_star(x, a)
@@ -79,7 +80,7 @@ Double_t E_star_func(Double_t *a_arr, Double_t *par)
     Double_t par_int[2] = {a, 1.0}; // A = 1.0 временно
 
     // Интегрирование для нормировки
-    TF1 *norm_int = new TF1("norm_int", norm_star_integrand, 0, 100, 2);
+    TF1 *norm_int = new TF1("norm_int_star", norm_star_integrand, 0, 100, 2);
     norm_int->SetParameters(par_int);
     Double_t norm = 2.0 * norm_int->Integral(0, 100);
 
@@ -88,12 +89,12 @@ Double_t E_star_func(Double_t *a_arr, Double_t *par)
     par_int[1] = A;
 
     // Интегрирование для кинетической энергии
-    TF1 *kinetic_int = new TF1("kinetic_int", kinetic_star_integrand, 0, 100, 2);
+    TF1 *kinetic_int = new TF1("kinetic_int_star", kinetic_star_integrand, 0, 100, 2);
     kinetic_int->SetParameters(par_int);
     Double_t T = hbar2_over_2m_star * 2.0 * kinetic_int->Integral(0, 100);
 
     // Интегрирование для потенциальной энергии
-    TF1 *potential_int = new TF1("potential_int", potential_star_integrand, 0, 10, 2);
+    TF1 *potential_int = new TF1("potential_int_star", potential_star_integrand, 0, 10, 2);
     potential_int->SetParameters(par_int);
     Double_t V = -V0_star * 2.0 * potential_int->Integral(0, 10);
 
@@ -110,8 +111,12 @@ Double_t E_star_func(Double_t *a_arr, Double_t *par)
 
 void task3star()
 {
+    // Задаём желаемый диапазон по оси X для графика волновой функции
+    Double_t x_min = -30.0; // Минимальное значение X
+    Double_t x_max = 30.0;  // Максимальное значение X
+
     // Создание функции энергии E_star(a)
-    TF1 *E = new TF1("E", E_star_func, 0.1, 50.0, 0);
+    TF1 *E = new TF1("E_star", E_star_func, 0.1, 50.0, 0);
     E->SetNpx(1000); // Увеличиваем количество точек для более гладкого графика
 
     // Создание полотна для E(a)
@@ -120,7 +125,7 @@ void task3star()
     E->SetLineColor(kBlue);
     E->Draw();
 
-    // Поиск минимума энергии и соответствующего 'a'
+    // Поиск минимума энергии и соответствующего 'a' в полном диапазоне
     Double_t a_min = E->GetMinimumX(0.1, 50.0);
     Double_t E_min = E->Eval(a_min);
     std::cout << "Минимальная энергия E(a) при a = " << a_min << " Å составляет E = " << E_min << " эВ" << std::endl;
@@ -133,14 +138,14 @@ void task3star()
 
     // Вычисление нормировочного множителя A(a_min)
     Double_t par_int[2] = {a_min, 1.0}; // A = 1.0 временно
-    TF1 *norm_int = new TF1("norm_int", norm_star_integrand, 0, 100, 2);
+    TF1 *norm_int = new TF1("norm_int_star", norm_star_integrand, 0, 100, 2);
     norm_int->SetParameters(par_int);
     Double_t norm = 2.0 * norm_int->Integral(0, 100);
     Double_t A_min = 1.0 / TMath::Sqrt(norm);
     std::cout << "Нормировочный множитель A = " << A_min << std::endl;
 
     // Создание волновой функции ψ(x) с оптимальным 'a' и 'A'
-    TF1 *psi = new TF1("psi_star", psi_star, -50.0, 50.0, 2);
+    TF1 *psi = new TF1("psi_star", psi_star, x_min, x_max, 2);
     psi->SetParameters(a_min, A_min); // Установка оптимального 'a' и 'A'
     psi->SetLineColor(kGreen + 2);
     psi->SetLineWidth(2);
@@ -150,11 +155,25 @@ void task3star()
     TCanvas *c1 = new TCanvas("c1_star", "Wavefunction ψ(x)", 800, 600);
     psi->Draw();
 
-    // Дополнительные улучшения графика ψ(x)
-    psi->GetXaxis()->SetRangeUser(-20, 20);
-    psi->GetYaxis()->SetRangeUser(psi->GetMinimum() * 1.2, psi->GetMaximum() * 1.2);
-
-    // Отображение графиков
+    // Автоматическое масштабирование осей для волновой функции
+    // Обновляем холст, чтобы получить доступ к гистограмме
     c1->Update();
+    TH1 *hist = psi->GetHistogram();
+
+    // Получаем минимальные и максимальные значения по Y
+    Double_t y_min = hist->GetMinimum();
+    Double_t y_max = hist->GetMaximum();
+
+    // Устанавливаем новые пределы по оси Y с некоторым запасом
+    hist->GetYaxis()->SetRangeUser(1.2 * y_min, 1.2 * y_max);
+
+    // Устанавливаем пределы по оси X в соответствии с заданными x_min и x_max
+    hist->GetXaxis()->SetRangeUser(x_min, x_max);
+
+    // Обновление графика после изменения пределов
+    c1->Modified();
+    c1->Update();
+
+    // Отображение графика энергии
     c2->Update();
 }
