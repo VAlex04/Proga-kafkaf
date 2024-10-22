@@ -2,19 +2,21 @@
 #include <TMath.h>
 #include <TF1.h>
 #include <TCanvas.h>
+#include <TMarker.h>
 #include <iostream>
 
 // Константы
-const Double_t hbar2_over_4m = 1.90499; // (ħ²) / (4m) в eV·Å²
+const Double_t hbar2_over_2m = 3.80998; // (ħ²)/(2m) в eV·Å²
+const Double_t V0 = 0.5;                // Глубина потенциальной ямы в эВ
 
 // Энергия ожидания как функция a
 Double_t E_func(Double_t *a, Double_t *par)
 {
-    // Кинетическая энергия: (ħ²)/(2m a²) = 2 * (ħ²)/(4m a²)
-    Double_t kinetic = 2.0 * hbar2_over_4m / (a[0] * a[0]);
+    // Кинетическая энергия: (ħ²)/(2m a²)
+    Double_t kinetic = hbar2_over_2m / (a[0] * a[0]);
 
-    // Потенциальная энергия: -0.5 эВ * Erf(10 / a)
-    Double_t potential = -0.5 * TMath::Erf(10.0 / a[0]);
+    // Потенциальная энергия: -V0 * Erf(√2 * 10 / a)
+    Double_t potential = -V0 * TMath::Erf(TMath::Sqrt(2.0) * 10.0 / a[0]);
 
     Double_t total_energy = kinetic + potential;
     return total_energy;
@@ -25,7 +27,7 @@ Double_t psi_func(Double_t *x, Double_t *par)
 {
     Double_t a_min = par[0]; // Оптимальное значение 'a'
     Double_t N = TMath::Power(2.0 / TMath::Pi(), 0.25) / TMath::Sqrt(a_min);
-    Double_t psi = N * TMath::Exp(-x[0] * x[0] / (2.0 * a_min * a_min));
+    Double_t psi = N * TMath::Exp(-x[0] * x[0] / (a_min * a_min));
     return psi;
 }
 
