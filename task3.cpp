@@ -1,4 +1,3 @@
-// task3.C
 #include <TMath.h>
 #include <TF1.h>
 #include <TCanvas.h>
