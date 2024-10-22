@@ -1,83 +1,71 @@
+// task3.C
 #include <TMath.h>
 #include <TF1.h>
 #include <TCanvas.h>
 #include <iostream>
 
-void variational_method() {
-    // Константы
-    const double hbar = 1.054571817e-34; // Дж·с
-    const double me = 9.10938356e-31;    // кг
-    const double eV = 1.602176634e-19;   // Дж
-    const double angstrom = 1e-10;       // м
+// Константы
+const Double_t hbar2_over_2m = 3.80998; // (ħ²) / (2m) в eV·Å²
 
-    // Параметры потенциальной ямы
-    const double U0 = -0.5 * eV; // Потенциал в Дж
-    const double L = 10 * angstrom; // Половина ширины ямы в метрах
+// Функция для расчёта энергии <Ψ|H|Ψ>
+Double_t E_func(Double_t *a, Double_t *par)
+{
+    // Кинетическая энергия: <T> = ħ² / (2m a²)
+    Double_t kinetic = hbar2_over_2m / (a[0] * a[0]);
 
-    // Функция потенциала U(x)
-    auto U = [&](double x) {
-        if (fabs(x) < L) {
-            return U0;
-        } else {
-            return 0.0;
-        }
-    };
+    // Потенциальная энергия: <U> = -0.5 * erf(10 * sqrt(2) / a)
+    Double_t potential = -0.5 * TMath::Erf(10.0 * TMath::Sqrt(2.0) / a[0]);
 
-    // Функция для расчета энергии в зависимости от параметра 'a'
-    TF1 *EnergyFunc = new TF1("EnergyFunc", [&](double *a, double *) {
-        double a_param = a[0];
+    // Общая энергия
+    Double_t total_energy = kinetic + potential;
 
-        // Нормировочный множитель
-        double norm = pow(2 / TMath::Pi(), 0.25) / sqrt(a_param);
+    return total_energy;
+}
 
-        // Кинетическая энергия ⟨T⟩
-        double T_integrand = [&](double *x, double *) {
-            double psi = norm * exp(-x[0] * x[0] / (a_param * a_param));
-            double d2psi_dx2 = norm * (4 * x[0] * x[0] - 2 * a_param * a_param) / (a_param * a_param * a_param * a_param) * exp(-x[0] * x[0] / (a_param * a_param));
-            return - (hbar * hbar) / (2 * me) * psi * d2psi_dx2;
-        };
+// Функция волновой функции ψ(x) с параметром a
+Double_t psi_func(Double_t *x, Double_t *par)
+{
+    Double_t a_min = par[0]; // Оптимальный параметр 'a'
+    Double_t N = pow(2.0 / TMath::Pi(), 0.25) / sqrt(a_min);
+    Double_t psi = N * exp(-x[0] * x[0] / (a_min * a_min));
+    return psi;
+}
 
-        // Потенциальная энергия ⟨V⟩
-        double V_integrand = [&](double *x, double *) {
-            double psi = norm * exp(-x[0] * x[0] / (a_param * a_param));
-            return psi * psi * U(x[0]);
-        };
+void task3()
+{
+    // Создаём функцию энергии E(a)
+    TF1 *E = new TF1("E", E_func, 0.1, 50.0, 0);
+    E->SetNpx(1000); // Увеличиваем количество точек для точности
 
-        // Пределы интегрирования (достаточно большие для экспоненты)
-        double xmin = -5 * a_param;
-        double xmax = 5 * a_param;
+    // Создаём холст для графика E(a)
+    TCanvas *c2 = new TCanvas("c2", "Energy Expectation Value E(a)", 800, 600);
+    E->SetTitle("Energy Expectation Value E(a); a (Å); E(a) (eV)");
+    E->SetLineColor(kBlue);
+    E->Draw();
 
-        // Интегрирование
-        TF1 *TFunc = new TF1("TFunc", T_integrand, xmin, xmax, 0);
-        double T = TFunc->Integral(xmin, xmax);
+    // Находим минимум энергии и соответствующее значение 'a'
+    Double_t a_min = E->GetMinimumX(0.1, 50.0);
+    Double_t E_min = E->Eval(a_min);
+    std::cout << "Минимальная энергия E(a) при a = " << a_min << " Å составляет E = " << E_min << " eV" << std::endl;
 
-        TF1 *VFunc = new TF1("VFunc", V_integrand, xmin, xmax, 0);
-        double V = VFunc->Integral(xmin, xmax);
+    // Отмечаем минимум на графике
+    TMarker *marker = new TMarker(a_min, E_min, 20);
+    marker->SetMarkerColor(kRed);
+    marker->SetMarkerSize(1.5);
+    marker->Draw("same");
 
-        delete TFunc;
-        delete VFunc;
+    // Создаём функцию волновой функции ψ(x) с оптимальным 'a'
+    TF1 *psi = new TF1("psi", psi_func, -20.0, 20.0, 1);
+    psi->SetParameter(0, a_min); // Устанавливаем оптимальный 'a'
+    psi->SetLineColor(kGreen+2);
+    psi->SetTitle("Ground State Wavefunction ψ(x); x (Å); ψ(x)");
+    psi->SetNpx(1000); // Увеличиваем количество точек для гладкости
 
-        double Energy = T + V;
-        return Energy;
-    }, 0.1 * angstrom, 10 * angstrom, 0);
+    // Создаём холст для графика ψ(x)
+    TCanvas *c1 = new TCanvas("c1", "Wavefunction ψ(x)", 800, 600);
+    psi->Draw();
 
-    // Поиск минимальной энергии и соответствующего 'a'
-    double a_min = EnergyFunc->GetMinimumX(0.1 * angstrom, 10 * angstrom);
-
-    std::cout << "Минимальная энергия: " << EnergyFunc->Eval(a_min) / eV << " эВ" << std::endl;
-    std::cout << "Оптимальное значение параметра a: " << a_min / angstrom << " Ангстрем" << std::endl;
-
-    // Построение волновой функции
-    TCanvas *c1 = new TCanvas("c1", "Wave Function", 800, 600);
-
-    TF1 *Psi = new TF1("Psi", [&](double *x, double *) {
-        double psi = pow(2 / TMath::Pi(), 0.25) / sqrt(a_min) * exp(-x[0] * x[0] / (a_min * a_min));
-        return psi;
-    }, -2 * L, 2 * L, 0);
-
-    Psi->SetTitle("Волновая функция основного состояния; x (м); Ψ(x)");
-    Psi->SetLineColor(kBlue);
-    Psi->Draw();
-
-    c1->SaveAs("wave_function.png");
+    // Сохраняем холсты в файлы (опционально)
+    // c2->SaveAs("Energy_vs_a.png");
+    // c1->SaveAs("Wavefunction.png");
 }
