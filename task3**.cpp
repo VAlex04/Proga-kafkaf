@@ -1,3 +1,4 @@
+// task3_graph.C
 #include <TMath.h>
 #include <TF1.h>
 #include <TCanvas.h>
@@ -68,7 +69,7 @@ void task3graph()
         delete E;
     }
 
-    // Создание графика
+   // Создание графика
     TGraph *gr = new TGraph(N, V0_values, x2_values);
     gr->SetTitle("<x^{2}> vs V_{0};V_{0} (eV);<x^{2}> (Å^{2})");
     gr->SetMarkerStyle(20);
@@ -79,9 +80,9 @@ void task3graph()
     TCanvas *c1 = new TCanvas("c1_graph", "<x^{2}> vs V_{0}", 800, 600);
     gr->Draw("APL");
 
-    // Дополнительные настройки осей
-    gr->GetXaxis()->SetLimits(V0_min, V0_max);
-    gr->GetYaxis()->SetRangeUser(0, x2_values[N - 1] * 1.2);
+    // Убираем ручную установку пределов осей
+    //gr->GetXaxis()->SetLimits(V0_min, V0_max);
+    //gr->GetYaxis()->SetRangeUser(0, x2_values[N - 1] * 1.2);
 
     // Обновление холста
     c1->Update();
