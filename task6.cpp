@@ -9,29 +9,7 @@
 #include <TROOT.h>
 #include <TLorentzVector.h>
 #include <TVector3.h>
-
-Double_t CDF_theta(Double_t theta) {
-    return (theta / TMath::Pi()) - (sin(2 * theta) / (2 * TMath::Pi()));
-}
-
-Double_t GenerateThetaK(TRandom3 &rand) {
-    Double_t r = rand.Rndm(); // Случайное число от 0 до 1
-    // Ищем θ_K, такой что CDF_theta(θ_K) = r
-    // Используем метод Ньютона
-    Double_t theta = TMath::Pi() * r; // Начальное приближение
-    Double_t tol = 1e-6; // Точность
-    Int_t max_iter = 100;
-    Int_t iter = 0;
-    while (iter < max_iter) {
-        Double_t F = CDF_theta(theta) - r;
-        Double_t dF = (1 - cos(2 * theta)) / TMath::Pi(); // Производная CDF по θ
-        Double_t delta = -F / dF;
-        theta += delta;
-        if (fabs(delta) < tol) break;
-        iter++;
-    }
-    return theta;
-}
+#include <TF1.h>
 
 void task6() {
     // Проверяем и удаляем существующие объекты, чтобы избежать предупреждений
@@ -79,10 +57,13 @@ void task6() {
     Int_t N_total = 100000; // Общее число сгенерированных событий
     Int_t N_registered = 0; // Число зарегистрированных событий
 
+    // Создаем функцию распределения для θ_K
+    TF1 *theta_dist = new TF1("theta_dist", "sin(x)*sin(x)", 0, TMath::Pi());
+
     // Основной цикл моделирования
     for (Int_t i = 0; i < N_total; ++i) {
         // 1. Генерация углов для K_S в лабораторной системе
-        Double_t theta_K = GenerateThetaK(rand);
+        Double_t theta_K = theta_dist->GetRandom();
         Double_t phi_K = rand.Rndm() * 2 * TMath::Pi() - TMath::Pi(); // От -pi до pi
 
         Double_t cos_theta_K = cos(theta_K);
@@ -114,8 +95,8 @@ void task6() {
         h_phi_pi_KS->Fill(phi_pi);
 
         // Импульс пиона в системе покоя K_S
-        Double_t E_pi = (m_KS * m_KS + m_pi * m_pi) / (2 * m_KS);
-        Double_t p_pi = sqrt(E_pi * E_pi - m_pi * m_pi);
+        Double_t E_pi = m_KS / 2.0; // Энергия пиона
+        Double_t p_pi = sqrt(E_pi * E_pi - m_pi * m_pi); // Импульс пиона
 
         // Вектора импульсов пионов в системе K_S
         Double_t p_pion_x = p_pi * sin_theta_pi * cos(phi_pi);
