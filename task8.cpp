@@ -37,10 +37,13 @@ void task8() {
     tree->SetBranchAddress("phiph", phiph);
 
     // Создаем гистограммы
+    // Важно: гистограммы остаются такими же, но теперь мы будем заполнять h_invmass только для событий с 2 кандидатами
     TH1F *h_invmass = new TH1F("h_invmass", "Invariant Mass of #pi^{0} Candidates; M_{#gamma#gamma} [GeV/c^{2}]; Number of Candidates", 100, 0, 0.3);
     TH1F *h_angle = new TH1F("h_angle", "Angle Between Photon Pairs; Angle [rad]; Number of Pairs", 100, 0, TMath::Pi());
 
-    // Переменная для подсчёта общего количества кандидатов
+    // Переменная для подсчёта общего количества кандидатов (по всем событиям)
+    // Это общее число найденных кандидатов во всех событиях, не обязательно используется для условия,
+    // но пусть останется для статистики.
     Long64_t total_candidates = 0;
 
     // Цикл по событиям
@@ -50,7 +53,10 @@ void task8() {
     for (Long64_t i = 0; i < nentries; i++) {
         tree->GetEntry(i);
 
-        // Цикл по всем парам фотонов
+        // Вектор для хранения инвариантных масс кандидатов текущего события
+        std::vector<Float_t> inv_masses;
+
+        // Цикл по всем парам фотонов (комбинации без повторений)
         for (Int_t j = 0; j < nph - 1; j++) {
             for (Int_t k = j + 1; k < nph; k++) {
                 // Энергии фотонов
@@ -78,23 +84,32 @@ void task8() {
                 TLorentzVector pi0_candidate = photon1 + photon2;
                 Float_t inv_mass = pi0_candidate.M();
 
-                // Расчет угла между фотонами и заполнение гистограммы
+                // Расчет угла между фотонами и заполнение гистограммы углов для всех пар
                 Float_t angle = photon1.Angle(photon2.Vect());
                 h_angle->Fill(angle);
 
                 // Проверка условия на инвариантную массу
                 if (inv_mass >= 0.1 && inv_mass <= 0.2) {
-                    // Заполняем гистограмму инвариантной массы
-                    h_invmass->Fill(inv_mass);
-                    // Увеличиваем счётчик кандидатов
-                    total_candidates++;
+                    // Сохраняем инвариантную массу кандидата в вектор
+                    inv_masses.push_back(inv_mass);
                 }
             }
         }
+
+        // Теперь, после перебора всех пар в данном событии,
+        // проверяем, сколько кандидатов мы нашли
+        if (inv_masses.size() == 2) {
+            // Если ровно два кандидата, заполняем гистограмму инвариантной массы
+            for (auto mass : inv_masses) {
+                h_invmass->Fill(mass);
+                total_candidates++; // считаем общее количество кандидатов во всем анализе
+            }
+        }
+        // Если кандидатов не 2, то мы игнорируем это событие в плане инвариантной массы
     }
 
     // Вывод общего количества кандидатов
-    std::cout << "Total number of pi0 candidates: " << total_candidates << std::endl;
+    std::cout << "Total number of pi0 candidates (from all events with exactly 2 candidates): " << total_candidates << std::endl;
 
     // Сохраняем гистограммы в файл
     TFile *outfile = new TFile("results.root", "RECREATE");
@@ -110,4 +125,15 @@ void task8() {
 
     TCanvas *c2 = new TCanvas("c2", "Angle Between Photons", 800, 600);
     h_angle->Draw();
+
+    // Тест угла, чтобы убедиться, что Angle() работает корректно
+    {
+        TVector3 p1(1.0, 0.0, 0.0);
+        TVector3 p2(0.0, 1.0, 0.0);
+        TLorentzVector photon1(p1, 1.0);
+        TLorentzVector photon2(p2, 1.0);
+
+        Float_t angle = photon1.Angle(photon2.Vect());
+        std::cout << "Angle test: " << angle << " rad, expected ~" << TMath::Pi()/2 << " rad" << std::endl;
+    }
 }
