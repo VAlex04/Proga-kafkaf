@@ -37,14 +37,18 @@ void task8() {
     tree->SetBranchAddress("phiph", phiph);
 
     // Создаем гистограммы
-    // Важно: гистограммы остаются такими же, но теперь мы будем заполнять h_invmass только для событий с 2 кандидатами
     TH1F *h_invmass = new TH1F("h_invmass", "Invariant Mass of #pi^{0} Candidates; M_{#gamma#gamma} [GeV/c^{2}]; Number of Candidates", 100, 0, 0.3);
     TH1F *h_angle = new TH1F("h_angle", "Angle Between Photon Pairs; Angle [rad]; Number of Pairs", 100, 0, TMath::Pi());
 
     // Переменная для подсчёта общего количества кандидатов (по всем событиям)
-    // Это общее число найденных кандидатов во всех событиях, не обязательно используется для условия,
-    // но пусть останется для статистики.
     Long64_t total_candidates = 0;
+
+    // Создаём дерево для записи кандидатов π0
+    TTree *pi0Tree = new TTree("Pi0CandidatesTree", "Tree with selected pi0 candidates");
+    Float_t out_mass, out_theta, out_phi;
+    pi0Tree->Branch("mass_pi0", &out_mass, "mass_pi0/F");
+    pi0Tree->Branch("theta_pi0", &out_theta, "theta_pi0/F");
+    pi0Tree->Branch("phi_pi0", &out_phi, "phi_pi0/F");
 
     // Цикл по событиям
     Long64_t nentries = tree->GetEntries();
@@ -55,6 +59,8 @@ void task8() {
 
         // Вектор для хранения инвариантных масс кандидатов текущего события
         std::vector<Float_t> inv_masses;
+        // Вектор для хранения четырехмерных векторов кандидатов pi0 текущего события
+        std::vector<TLorentzVector> pi0_candidates;
 
         // Цикл по всем парам фотонов (комбинации без повторений)
         for (Int_t j = 0; j < nph - 1; j++) {
@@ -65,10 +71,10 @@ void task8() {
 
                 // Углы фотонов
                 Float_t theta1 = thetaph[j];
-                Float_t phi1 = phiph[j];
+                Float_t phi1   = phiph[j];
 
                 Float_t theta2 = thetaph[k];
-                Float_t phi2 = phiph[k];
+                Float_t phi2   = phiph[k];
 
                 // Расчет компонент импульса фотонов
                 TVector3 p1;
@@ -90,31 +96,42 @@ void task8() {
 
                 // Проверка условия на инвариантную массу
                 if (inv_mass >= 0.1 && inv_mass <= 0.2) {
-                    // Сохраняем инвариантную массу кандидата в вектор
+                    // Сохраняем инвариантную массу кандидата
                     inv_masses.push_back(inv_mass);
+                    // Сохраняем сам четырехмерный вектор кандидата
+                    pi0_candidates.push_back(pi0_candidate);
                 }
             }
         }
 
-        // Теперь, после перебора всех пар в данном событии,
-        // проверяем, сколько кандидатов мы нашли
+        // Проверяем, сколько кандидатов мы нашли в этом событии
         if (inv_masses.size() == 2) {
             // Если ровно два кандидата, заполняем гистограмму инвариантной массы
-            for (auto mass : inv_masses) {
+            // и записываем кандидатов в дерево
+            for (size_t c = 0; c < inv_masses.size(); c++) {
+                Float_t mass = inv_masses[c];
                 h_invmass->Fill(mass);
-                total_candidates++; // считаем общее количество кандидатов во всем анализе
+                total_candidates++;
+
+                // Восстанавливаем направление pi0
+                TVector3 p_pi0 = pi0_candidates[c].Vect();
+                out_mass = mass;
+                out_theta = p_pi0.Theta();
+                out_phi   = p_pi0.Phi();
+                pi0Tree->Fill();
             }
         }
-        // Если кандидатов не 2, то мы игнорируем это событие в плане инвариантной массы
+        // Если кандидатов не 2, то мы игнорируем это событие в плане инвариантной массы и не записываем в дерево
     }
 
     // Вывод общего количества кандидатов
     std::cout << "Total number of pi0 candidates (from all events with exactly 2 candidates): " << total_candidates << std::endl;
 
-    // Сохраняем гистограммы в файл
+    // Сохраняем гистограммы и дерево в файл
     TFile *outfile = new TFile("results.root", "RECREATE");
     h_invmass->Write();
     h_angle->Write();
+    pi0Tree->Write();
     outfile->Close();
 
     std::cout << "Analysis complete. Results saved in file results.root" << std::endl;
