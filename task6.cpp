@@ -58,7 +58,7 @@ void task6() {
     Int_t N_registered = 0; // Число зарегистрированных событий
 
     // Создаем функцию распределения для θ_K
-    TF1 *theta_dist = new TF1("theta_dist", "sin(x)*sin(x)", 0, TMath::Pi());
+    TF1 *theta_dist = new TF1("theta_dist", "sin(x)*sin(x)*sin(x)", 0, TMath::Pi());
 
     // Основной цикл моделирования
     for (Int_t i = 0; i < N_total; ++i) {
@@ -110,9 +110,12 @@ void task6() {
         // Направление движения K_S в лабораторной системе
         TVector3 K_direction = KS_lab.Vect().Unit();
 
+        double old_angle = pi_plus.Z() / pi_plus.P();
         // Поворачиваем импульсы пионов так, чтобы ось z совпала с направлением K_S
         pi_plus.RotateUz(K_direction);
         pi_minus.RotateUz(K_direction);
+        double new_angle = pi_plus.Vect().Dot(K_direction) / pi_plus.P();
+        std::cout << old_angle - new_angle << std::endl;
 
         // Скорость K_S в лабораторной системе
         TVector3 beta_KS = KS_lab.BoostVector();
