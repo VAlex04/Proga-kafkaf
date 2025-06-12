@@ -1,139 +1,150 @@
 #include <TFile.h>
- #include <TTree.h>
- #include <TRandom3.h>
- #include <TMath.h>
- #include <iostream>
- 
- // --- Глобальные константы ---
- static const double mTau  = 1.77686;   // масса tau, ГэВ
- static const double Ebeam = 5.29;       // энергия e-/e+ пучка, ГэВ
- // Вычисление импульса tau: p_tau = sqrt(E_beam^2 - mTau^2)
- static const double pTau  = TMath::Sqrt(Ebeam*Ebeam - mTau*mTau);
- // Энергия tau: E_tau = sqrt(p_tau^2 + mTau^2)
- static const double E_tau = TMath::Sqrt(pTau*pTau + mTau*mTau);
- static const double pi    = TMath::Pi();
- 
- // --- Прототипы функций ---
- double Weight(double cosTh, const double *xiMinus, const double *xiPlus);
- void generateTauTau(int N=100000);
- 
- // --- Главная функция-макрос для ROOT ---
- void generator_tautau()
- {
-    // Генерация 100k событий
-    generateTauTau(100000);
- }
- 
- //------------------------------------------------------------------------------
- // Функция для вычисления веса с учетом полного множителя
- // Реализует:
- //   w(θ) = [α²/(64 E_τ²)] β_τ [D₀(θ) + D_ij(θ) ξ⁻_i ξ⁺_j]
- // где D₀(θ) = 1 + cos²θ + (1/γ²) sin²θ,
- // Но я взял только D_zz ибо не знаю, все надо учитывать или только вдоль z куда они направлены: D_zz = cos²θ - sin²θ/γ².
- double Weight(double cosTh, const double *xiMinus, const double *xiPlus)
- {
-    double sinTh2 = 1.0 - cosTh*cosTh;  // sin²θ = 1 - cos²θ
-    double gamma  = E_tau / mTau;        // гамма-фактор τ
-    // Спин-независимая часть:
-    double D0 = (1.0 + cosTh*cosTh) + (sinTh2 / (gamma*gamma));
-    // Модельная зависимость для D_ij: только компонента D_zz:
-    double D_zz = cosTh*cosTh - (sinTh2/(gamma*gamma));
-    // Извлечение z-компоненты векторов поляризации:
-    double xiMz = xiMinus[2];
-    double xiPz = xiPlus[2];
-    double polTerm = D_zz * (xiMz * xiPz);
-    double baseWeight = D0 + polTerm; // вес без нормировочного множителя
- 
-    // Теперь включение общего множителя:
-    double beta_tau = pTau / E_tau; // β_τ = p_τ / E_τ
-    double alpha_const = 1.0/137.0;   // α ≈ 1/137
-    double kappa = (alpha_const * alpha_const) / (64 * E_tau * E_tau) * beta_tau;
-    double w = kappa * baseWeight;
-    return (w > 0.0) ? w : 0.0;  // отсечение отрицательных значений, ибо в реальности не может быть такого
- }
- 
- //------------------------------------------------------------------------------
- // Генерация событий e+ e- -> tau+ tau-
- void generateTauTau(int N)
- {
-    // 1) Открытие выходного ROOT-файла и создание TTree
-    TFile *fout = new TFile("tauPolar.root", "RECREATE");
-    TTree *tree = new TTree("tree","tau events with polarization");
- 
-    // 2) Объявление переменных для записи 4-векторов и поляризаций
-    Float_t pxMinus, pyMinus, pzMinus, Eminus;
-    Float_t pxPlus,  pyPlus,  pzPlus,  Eplus;
-    Float_t polMinus[3], polPlus[3];
- 
-    // Создание ветви TTree для этих переменных
-    tree->Branch("pxMinus",&pxMinus,"pxMinus/F");
-    tree->Branch("pyMinus",&pyMinus,"pyMinus/F");
-    tree->Branch("pzMinus",&pzMinus,"pzMinus/F");
-    tree->Branch("Eminus", &Eminus, "Eminus/F");
- 
-    tree->Branch("pxPlus",&pxPlus,"pxPlus/F");
-    tree->Branch("pyPlus",&pyPlus,"pyPlus/F");
-    tree->Branch("pzPlus",&pzPlus,"pzPlus/F");
-    tree->Branch("Eplus", &Eplus, "Eplus/F");
- 
-    tree->Branch("polMinus", polMinus, "polMinus[3]/F");
-    tree->Branch("polPlus",  polPlus,  "polPlus[3]/F");
- 
-    // 3) Инициализация генератора случайных чисел TRandom3
-    TRandom3 rand(0);  // seed=0: генерация на основе системного времени
- 
-    // 4) Задание (как пример) постоянных векторов поляризации для tau- и tau+
-    //    Допустим: tau- поляризован вдоль +z, tau+ вдоль -z.
-    double xiM[3] = {0.0, 0.0, +1.0};
-    double xiP[3] = {0.0, 0.0, -1.0};
- 
-    // 5) Нахождение максимального значения веса (w_max) для метода acceptance-rejection - один из методов Монте-Карло
-    double wmax = 0.0;
-    for(int i=0; i<1000; i++){
-       double cth  = -1.0 + 2.0*(i/999.0);
-       double wval = Weight(cth, xiM, xiP);
-       if(wval > wmax) wmax = wval;
+#include <TTree.h>
+#include <TRandom3.h>
+#include <TMath.h>
+#include <TH1D.h>
+#include <TF1.h>
+#include <TCanvas.h>
+#include <iostream>
+#include <string>
+
+// ---------- физконстанты ----------
+static const double mTau  = 1.77686;   // GeV
+static const double Ebeam = 5.29;      // GeV  ( √s /2 )
+static const double pTau  = TMath::Sqrt(Ebeam*Ebeam - mTau*mTau);
+static const double E_tau = TMath::Sqrt(pTau*pTau + mTau*mTau);
+static const double gammaTau = E_tau / mTau;
+static const double betaTau  = pTau  / E_tau;
+static const double alphaEM  = 1./137.035999;
+static const double kNorm   = (alphaEM*alphaEM)/(64.*E_tau*E_tau)*betaTau; // общий множитель
+
+struct PolVec { double x{}, y{}, z{}; };
+
+// ---------- вспом. функции для матрицы D ----------
+static inline double D0(double ct){
+    double st2 = 1. - ct*ct;
+    return 1. + ct*ct + st2/(gammaTau*gammaTau);
+}
+static inline double Dij(int i,int j,double ct){
+    double st2 = 1.-ct*ct;
+    double b2 = betaTau*betaTau;
+    double s2t = 2.*TMath::Sqrt(st2)*ct; // sin2θ = 2 sinθ cosθ
+    if(i==0&&j==0) return (1.+1./(gammaTau*gammaTau))*st2;
+    if(i==1&&j==1) return -b2*st2;
+    if(i==2&&j==2) return 1.+ct*ct - st2/(gammaTau*gammaTau);
+    if(i==0&&j==2) return s2t/gammaTau;
+    if(i==2&&j==0) return s2t/gammaTau;
+    return 0.;
+}
+
+// ---------- полный вес ----------
+double Weight(double ct, const PolVec &xiM, const PolVec &xiP)
+{
+    double w = D0(ct);
+    const double xm[3]={xiM.x,xiM.y,xiM.z};
+    const double xp[3]={xiP.x,xiP.y,xiP.z};
+    for(int i=0;i<3;++i)
+        for(int j=0;j<3;++j)
+            w += Dij(i,j,ct)*xm[i]*xp[j];
+    return kNorm * w;             // ≥0 для любых ξ
+}
+
+// ---------- генерация τ‑пар ----------
+void makeSample(Long64_t N, int spinMode, const char *outName)
+{
+    TFile  fout(outName,"RECREATE");
+    TTree  tree("tree","e+e- -> tau+tau-");
+    TH1D  hCos("hCos","cos#theta;cos#theta;Events",50,-1,1);
+
+    // ветки дерева
+    Float_t pxM,pyM,pzM,eM, pxP,pyP,pzP,eP;
+    tree.Branch("pxMinus",&pxM,"pxMinus/F");
+    tree.Branch("pyMinus",&pyM,"pyMinus/F");
+    tree.Branch("pzMinus",&pzM,"pzMinus/F");
+    tree.Branch("Eminus", &eM ,"Eminus/F");
+    tree.Branch("pxPlus", &pxP,"pxPlus/F");
+    tree.Branch("pyPlus", &pyP,"pyPlus/F");
+    tree.Branch("pzPlus", &pzP,"pzPlus/F");
+    tree.Branch("Eplus",  &eP ,"Eplus/F");
+
+    TRandom3 rng(0);
+
+    // предварительный поиск wMax
+    double wMax=0.;
+    for(int i=0;i<1000;++i){
+        double ct = -1.+2.*i/999.;
+        PolVec z0{0,0,0};
+        double w = Weight(ct,z0,z0);
+        if(w>wMax) wMax=w;
     }
- 
-    // 6) Генерация событий до получения N принятых событий
-    int nAccepted = 0;
-    while(nAccepted < N)
-    {
-       // 6a) Случайная генерация cosTheta и phi
-       double cth = rand.Uniform(-1.0,1.0);
-       double phi = rand.Uniform(0, 2.0*pi);
- 
-       // 6b) Вычисление веса для сгенерированного угла
-       double wval = Weight(cth, xiM, xiP);
- 
-       // 6c) Применение метода acceptance-rejection:
-       double r = rand.Uniform(0, wmax);
-       if(r > wval) continue;  // если случайное число больше, событие отклоняется
- 
-       // 6d) Если событие принято, идет вычисление 3-импульс tau- и tau+
-       double sth = TMath::Sqrt(1.0 - cth*cth);
-       double px  = pTau * sth * TMath::Cos(phi);
-       double py  = pTau * sth * TMath::Sin(phi);
-       double pz  = pTau * cth;
- 
-       // Присваивание компоненты 4-векторов:
-       pxMinus = px;  pyMinus = py;  pzMinus = pz;   Eminus = E_tau;
-       pxPlus  = -px; pyPlus  = -py; pzPlus  = -pz;  Eplus  = E_tau;
- 
-       // Записывание векторов поляризации (как заданы)
-       polMinus[0] = xiM[0];  polMinus[1] = xiM[1];  polMinus[2] = xiM[2];
-       polPlus[0]  = xiP[0];  polPlus[1]  = xiP[1];  polPlus[2]  = xiP[2];
- 
-       // 6e) Записывание события в TTree
-       tree->Fill();
-       nAccepted++;
+    // небольшое увеличение запаса
+    wMax*=1.2;
+
+    auto randomSpin=[&](PolVec &v){
+        double c=rng.Uniform(-1,1); double s=TMath::Sqrt(1-c*c);
+        double ph=rng.Uniform(0,2*TMath::Pi());
+        v.x=s*TMath::Cos(ph); v.y=s*TMath::Sin(ph); v.z=c; };
+
+    Long64_t accepted=0;
+    while(accepted<N){
+        double ct  = rng.Uniform(-1,1);
+        double phi = rng.Uniform(0,2*TMath::Pi());
+
+        PolVec xiM,xiP;
+        if(spinMode==0){ xiM={0,0,0}; xiP={0,0,0}; }
+        else if(spinMode==1){ xiM={0,0, +1}; xiP={0,0,-1}; }
+        else { randomSpin(xiM); randomSpin(xiP);} // spinMode==2
+
+        double w = Weight(ct,xiM,xiP);
+        if(rng.Uniform(0,wMax)>w) continue;
+
+        double st = TMath::Sqrt(1-ct*ct);
+        double px = pTau*st*TMath::Cos(phi);
+        double py = pTau*st*TMath::Sin(phi);
+        double pz = pTau*ct;
+
+        pxM=px; pyM=py; pzM=pz; eM=E_tau;
+        pxP=-px;pyP=-py;pzP=-pz;eP=E_tau;
+
+        tree.Fill();
+        hCos.Fill(ct);
+        ++accepted;
     }
- 
-    // 7) Сохранение дерева и закрытие файла
-    tree->Write();
-    fout->Close();
- 
-    std::cout << "Done. Generated " << N << " events into tauPolar.root\n"
-              << "Max weight was " << wmax << "\n";
- }
- 
+
+    tree.Write();
+    hCos.Write();
+    fout.Close();
+    std::cout<<"Generated "<<accepted<<" events → "<<outName<<" (spinMode="<<spinMode<<")\n";
+}
+
+// ---------- интерфейс для ROOT ----------
+void plotCos(const char *file = "tauPolar.root")
+{
+    TFile f(file,"READ");
+    TH1D *h = dynamic_cast<TH1D*>(f.Get("hCos"));
+    if(!h){ std::cerr<<"hCos not found in "<<file<<"\n"; return; }
+
+    // функция N·(1+x²)
+    TF1 *f1 = new TF1("f1","[0]*(1 + x*x)",-1.,1.);
+    f1->SetParameter(0,h->Integral());
+    h->Fit(f1,"RQL");          // тихий (Q) лайклихуд-фит (L) в заданном (R) диапазоне
+
+    TCanvas *c = new TCanvas("cCos","cos theta",600,450);
+    h->SetMarkerStyle(20);
+    h->Draw("E1");
+    f1->Draw("same");
+    c->SaveAs("fig_cosTheta.pdf");
+
+    std::cout<<"\nFit result:"
+             <<"\n  N          = "<<f1->GetParameter(0)
+             <<"\n  chi2/ndf   = "<<f1->GetChisquare()/f1->GetNDF()
+             <<std::endl;
+}
+
+void generator_tautau(const char *mode="make", Long64_t N=300000, int spinMode=0, const char *fname="tauPolar.root")
+{
+    std::string m(mode);
+    if(m=="make")      makeSample(N,spinMode,fname);
+    else if(m=="plot") plotCos(fname);
+    else std::cerr<<"Unknown mode: "<<mode<<" (use make/plot)\n";
+}
