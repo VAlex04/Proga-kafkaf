@@ -45,12 +45,6 @@ void hist_cos_fit(const char* fname = "tauPolar.root")
     //----------------------------------------------------------
     // подвинем stats-блок, чтобы не закрывал кривую
     //----------------------------------------------------------
-    if(auto st = (TPaveStats*)h->FindObject("stats")){
-        st->SetX1NDC(0.62); st->SetX2NDC(0.88);
-        st->SetY1NDC(0.68); st->SetY2NDC(0.88);
-    }
-    gPad->Modified();
-    gPad->Update();
     if (auto st = (TPaveStats*)gPad->FindObject("stats")) {
         st->SetX1NDC(0.15);
         st->SetX2NDC(0.45);
