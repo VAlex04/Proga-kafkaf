@@ -38,6 +38,16 @@ static inline double Dij(int i,int j,double ct){
     return 0.;
 }
 
+static void randomSpin(TRandom3 &rng, PolVec &v)
+{
+    double c = rng.Uniform(-1,1);
+    double s = TMath::Sqrt(1 - c*c);
+    double ph = rng.Uniform(0, 2*TMath::Pi());
+    v.x = s*TMath::Cos(ph);
+    v.y = s*TMath::Sin(ph);
+    v.z = c;
+}
+
 // ---------- полный вес ----------
 double Weight(double ct, const PolVec &xiM, const PolVec &xiP)
 {
@@ -81,12 +91,6 @@ void makeSample(Long64_t N, int spinMode, const char *outName)
     }
     // небольшое увеличение запаса
     wMax*=1.2;
-
-    auto randomSpin=[&](PolVec &v){
-        double c=rng.Uniform(-1,1); double s=TMath::Sqrt(1-c*c);
-        double ph=rng.Uniform(0,2*TMath::Pi());
-        v.x=s*TMath::Cos(ph); v.y=s*TMath::Sin(ph); v.z=c; };
-
     Long64_t accepted=0;
     while(accepted<N){
         double ct  = rng.Uniform(-1,1);
@@ -95,7 +99,7 @@ void makeSample(Long64_t N, int spinMode, const char *outName)
         PolVec xiM,xiP;
         if(spinMode==0){ xiM={0,0,0}; xiP={0,0,0}; }
         else if(spinMode==1){ xiM={0,0, +1}; xiP={0,0,-1}; }
-        else { randomSpin(xiM); randomSpin(xiP);} // spinMode==2
+        else { randomSpin(rng, xiM); randomSpin(rng, xiP);} // spinMode==2
 
         double w = Weight(ct,xiM,xiP);
         if(rng.Uniform(0,wMax)>w) continue;
