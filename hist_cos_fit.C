@@ -51,7 +51,14 @@ void hist_cos_fit(const char* fname = "tauPolar.root")
     }
     gPad->Modified();
     gPad->Update();
-
+    if (auto st = (TPaveStats*)gPad->FindObject("stats")) {
+        st->SetX1NDC(0.15);
+        st->SetX2NDC(0.45);
+        st->SetY1NDC(0.65);
+        st->SetY2NDC(0.90);
+        gPad->Modified();
+        gPad->Update();
+    }
     //----------------------------------------------------------
     // вывод чисел в консоль
     //----------------------------------------------------------
