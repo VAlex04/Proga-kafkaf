@@ -7,6 +7,7 @@
 #include <TCanvas.h>
 #include <iostream>
 #include <string>
+#include <cstdlib>
 
 // ---------- физконстанты ----------
 static const double mTau  = 1.77686;   // GeV
@@ -55,6 +56,7 @@ void makeSample(Long64_t N, int spinMode, const char *outName)
     TFile  fout(outName,"RECREATE");
     TTree  tree("tree","e+e- -> tau+tau-");
     TH1D  hCos("hCos","cos#theta;cos#theta;Events",50,-1,1);
+    hCos.SetDirectory(&fout);            // keep histogram in the output file
 
     // ветки дерева
     Float_t pxM,pyM,pzM,eM, pxP,pyP,pzP,eP;
@@ -133,7 +135,7 @@ void plotCos(const char *file = "tauPolar.root")
     h->SetMarkerStyle(20);
     h->Draw("E1");
     f1->Draw("same");
-    c->SaveAs("fig_cosTheta.pdf");
+    c->SaveAs("изображение.png");
 
     std::cout<<"\nFit result:"
              <<"\n  N          = "<<f1->GetParameter(0)
@@ -148,3 +150,15 @@ void generator_tautau(const char *mode="make", Long64_t N=300000, int spinMode=0
     else if(m=="plot") plotCos(fname);
     else std::cerr<<"Unknown mode: "<<mode<<" (use make/plot)\n";
 }
+
+#ifndef __CLING__
+int main(int argc, char **argv)
+{
+    const char *mode = (argc>1) ? argv[1] : "make";
+    Long64_t N = (argc>2) ? std::atoll(argv[2]) : 300000;
+    int spinMode = (argc>3) ? std::atoi(argv[3]) : 0;
+    const char *fname = (argc>4) ? argv[4] : "tauPolar.root";
+    generator_tautau(mode,N,spinMode,fname);
+    return 0;
+}
+#endif
