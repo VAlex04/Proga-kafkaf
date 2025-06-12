@@ -123,27 +123,27 @@ void makeSample(Long64_t N, int spinMode, const char *outName)
     std::cout<<"Generated "<<accepted<<" events → "<<outName<<" (spinMode="<<spinMode<<")\n";
 }
 
-// ---------- интерфейс для ROOT ----------
-void plotCos(const char *file = "tauPolar.root")
+// ---------- функция подгонки гистограммы ----------
+void fitCos(const char *file = "tauPolar.root")
 {
     TFile f(file,"READ");
     TH1D *h = dynamic_cast<TH1D*>(f.Get("hCos"));
     if(!h){ std::cerr<<"hCos not found in "<<file<<"\n"; return; }
 
-    // функция N·(1+x²)
-    TF1 *f1 = new TF1("f1","[0]*(1 + x*x)",-1.,1.);
-    f1->SetParameter(0,h->Integral());
-    h->Fit(f1,"RQL");          // тихий (Q) лайклихуд-фит (L) в заданном (R) диапазоне
+    TF1 fitFunc("fitFunc","[0]*(1 + x*x)",-1.,1.);
+    fitFunc.SetParameter(0,h->Integral());
+    h->Fit(&fitFunc,"RQL");          // тихий (Q) лайклихуд-фит (L) в заданном (R) диапазоне
 
-    TCanvas *c = new TCanvas("cCos","cos theta",600,450);
+    TCanvas c("cCos","cos theta",600,450);
     h->SetMarkerStyle(20);
+    h->SetMinimum(0.);               // ось OY начинается с нуля
     h->Draw("E1");
-    f1->Draw("same");
-    c->SaveAs("изображение.png");
+    fitFunc.Draw("same");
+    c.SaveAs("изображение.png");
 
     std::cout<<"\nFit result:"
-             <<"\n  N          = "<<f1->GetParameter(0)
-             <<"\n  chi2/ndf   = "<<f1->GetChisquare()/f1->GetNDF()
+             <<"\n  N          = "<<fitFunc.GetParameter(0)
+             <<"\n  chi2/ndf   = "<<fitFunc.GetChisquare()/fitFunc.GetNDF()
              <<std::endl;
 }
 
@@ -151,8 +151,8 @@ void generator_tautau(const char *mode="make", Long64_t N=300000, int spinMode=0
 {
     std::string m(mode);
     if(m=="make")      makeSample(N,spinMode,fname);
-    else if(m=="plot") plotCos(fname);
-    else std::cerr<<"Unknown mode: "<<mode<<" (use make/plot)\n";
+    else if(m=="plot" || m=="fit") fitCos(fname);
+    else std::cerr<<"Unknown mode: "<<mode<<" (use make/fit)\n";
 }
 
 #ifndef __CLING__
