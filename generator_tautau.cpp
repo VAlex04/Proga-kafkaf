@@ -123,28 +123,27 @@ void makeSample(Long64_t N, int spinMode, const char *outName)
     std::cout<<"Generated "<<accepted<<" events → "<<outName<<" (spinMode="<<spinMode<<")\n";
 }
 
-// ---------- интерфейс для ROOT ----------
-void plotCos(const char *file = "tauPolar.root")
+// ——— прототип (объявление) ———
+void plotCos(const char* file = "tauPolar.root")
 {
     TFile f(file,"READ");
-    TH1D *h = dynamic_cast<TH1D*>(f.Get("hCos"));
-    if(!h){ std::cerr<<"hCos not found in "<<file<<"\n"; return; }
+    TH1D* h = dynamic_cast<TH1D*>(f.Get("hCos"));
+    if(!h){ std::cerr<<"hCos not found\n"; return; }
 
-    // функция N·(1+x²)
-    TF1 *f1 = new TF1("f1","[0]*(1 + x*x)",-1.,1.);
+    TF1* f1 = new TF1("f1","[0]*(1+x*x)",-1.,1.);
     f1->SetParameter(0,h->Integral());
-    h->Fit(f1,"RQL");          // тихий (Q) лайклихуд-фит (L) в заданном (R) диапазоне
 
-    TCanvas *c = new TCanvas("cCos","cos theta",600,450);
+    TCanvas* c = new TCanvas("cCos","cos#theta",600,450);
     h->SetMarkerStyle(20);
+    h->SetMinimum(0);
     h->Draw("E1");
+    h->Fit(f1,"RQL");
     f1->Draw("same");
-    c->SaveAs("изображение.png");
+    c->SaveAs("fig_cosTheta.pdf");
 
-    std::cout<<"\nFit result:"
-             <<"\n  N          = "<<f1->GetParameter(0)
-             <<"\n  chi2/ndf   = "<<f1->GetChisquare()/f1->GetNDF()
-             <<std::endl;
+    std::cout << "\nFit result:\n N        = " << f1->GetParameter(0)
+              << "\n chi2/ndf = " << f1->GetChisquare()/f1->GetNDF()
+              << std::endl;
 }
 
 void generator_tautau(const char *mode="make", Long64_t N=300000, int spinMode=0, const char *fname="tauPolar.root")
@@ -154,6 +153,7 @@ void generator_tautau(const char *mode="make", Long64_t N=300000, int spinMode=0
     else if(m=="plot") plotCos(fname);
     else std::cerr<<"Unknown mode: "<<mode<<" (use make/plot)\n";
 }
+
 
 #ifndef __CLING__
 int main(int argc, char **argv)
